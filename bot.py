@@ -23,8 +23,8 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-@bot.command()
-async def ทำปก(ctx, *, title: str):
+@bot.command(name="ทำปก")
+async def make_cover(ctx, *, title: str):
     if not ctx.message.attachments:
         await ctx.send("ลูกพี่ลืมแนบรูปภาพครับ!")
         return
