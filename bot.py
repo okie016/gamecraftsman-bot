@@ -1,107 +1,97 @@
 import discord
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
-import io
-import aiohttp
-import os
+import io, aiohttp, os, re
 from flask import Flask
 from threading import Thread
 
-# --- 1. ระบบ Web Server (หลอกให้ Render.com ไม่หลับ) ---
+# --- [ระบบ Web Server] ---
 app = Flask('')
 @app.route('/')
-def home():
-    return "GameCraftsman Bot is Live!"
-
-def run():
-    app.run(host='0.0.0.0', port=8000)
-
+def home(): return "GameCraftsman Bot is Live!"
+def run(): app.run(host='0.0.0.0', port=8000)
 def keep_alive():
-    t = Thread(target=run)
-    t.start()
+    t = Thread(target=run); t.start()
 
-# --- 2. ตั้งค่าบอท Discord ---
+# --- [ตั้งค่าบอท] ---
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+def draw_styled_text(draw, text, font, y_position, container_width, default_color, highlight_color):
+    """ฟังก์ชันวาดข้อความแยกสีและจัดกึ่งกลางบรรทัดเดียว"""
+    # แยกส่วนประกอบด้วย Tag [color]...[/color]
+    parts = re.split(r'(\[color\].*?\[/color\])', text)
+    
+    # 1. คำนวณความกว้างรวมทั้งหมดก่อนเพื่อหาจุดเริ่มวางให้กึ่งกลาง
+    total_width = 0
+    display_parts = []
+    
+    for part in parts:
+        if part.startswith('[color]') and part.endswith('[/color]'):
+            content = part.replace('[color]', '').replace('[/color]', '')
+            color = highlight_color
+        else:
+            content = part
+            color = default_color
+        
+        if content:
+            bbox = draw.textbbox((0, 0), content, font=font)
+            w = bbox[2] - bbox[0]
+            total_width += w
+            display_parts.append({'text': content, 'color': color, 'width': w})
+
+    # 2. เริ่มวาดจากจุดที่ทำให้ก้อนทั้งหมดอยู่กลางภาพ
+    current_x = (container_width - total_width) // 2
+    
+    for p in display_parts:
+        draw.text((current_x, y_position), p['text'], font=font, fill=p['color'])
+        current_x += p['width']
+
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
-    # --- [ส่วนตั้งค่าดีไซน์ - ปรับแก้ตรงนี้ได้เลย] ---
-    FONT_SIZE = 87             # ขนาดตัวอักษร
-    TEXT_Y_POSITION = 1100      # ระยะห่างจากขอบบน (แกน Y) ส่วนแกน X จะจัดกลางให้อัตโนมัติ
-    TEXT_COLOR = (255, 255, 255, 255) # สีขาว (RGBA)
-    # ------------------------------------------
+    # --- [ตั้งค่าดีไซน์] ---
+    FONT_SIZE = 80
+    TEXT_Y_POSITION = 1100
+    MAIN_COLOR = (255, 255, 255, 255)      # สีขาว
+    HIGHLIGHT_COLOR = (188, 234, 47, 255)   # สีทอง (ปรับเปลี่ยนได้ตามใจชอบ)
+    # -------------------
 
-    # เช็กว่ามีการแนบรูปมาไหม
     if not ctx.message.attachments:
-        await ctx.send("ลูกพี่ลืมแนบรูปภาพครับ! รบกวนอัปโหลดรูปแล้วใส่แคปชันว่า !ทำปก [พาดหัว] ด้วยครับ")
+        await ctx.send("ลูกพี่ลืมแนบรูปภาพครับ!")
         return
 
     attachment = ctx.message.attachments[0]
-    
-    # ดึงรูปจาก Discord
     async with aiohttp.ClientSession() as session:
         async with session.get(attachment.url) as resp:
-            if resp.status != 200:
-                await ctx.send("ดึงรูปภาพไม่สำเร็จ ลองใหม่อีกครั้งนะครับ")
-                return
             data = io.BytesIO(await resp.read())
             user_image = Image.open(data).convert("RGBA")
 
+    template = Image.open("template.png").convert("RGBA")
+    t_width, t_height = template.size
+
+    # จัดการรูปพื้นหลัง
+    ratio = t_height / user_image.height
+    new_width = int(user_image.width * ratio)
+    user_image = user_image.resize((new_width, t_height), Image.Resampling.LANCZOS)
+    
+    final_image = Image.new("RGBA", (t_width, t_height))
+    offset_x = (t_width - new_width) // 2
+    final_image.paste(user_image, (offset_x, 0))
+    final_image.paste(template, (0, 0), template)
+    
+    # วาดข้อความด้วยระบบ Styled Text
+    draw = ImageDraw.Draw(final_image)
     try:
-        # 3. โหลดไฟล์ Template และเตรียมพื้นที่
-        template = Image.open("template.png").convert("RGBA")
-        t_width, t_height = template.size
-
-        # 4. จัดการรูปพื้นหลัง (Fit Height & Center Width)
-        # ปรับความสูงรูปให้เท่ากับ Template โดยรักษาอัตราส่วน (Aspect Ratio)
-        ratio = t_height / user_image.height
-        new_width = int(user_image.width * ratio)
-        user_image = user_image.resize((new_width, t_height), Image.Resampling.LANCZOS)
-        
-        # สร้างแคนวาสใหม่และวางรูปให้อยู่ตรงกลางแกน X
-        final_image = Image.new("RGBA", (t_width, t_height))
-        offset_x = (t_width - new_width) // 2
-        final_image.paste(user_image, (offset_x, 0))
-        
-        # 5. วาง Template ทับ (ส่วนที่เจาะใสจะมองเห็นรูปข้างล่าง)
-        final_image.paste(template, (0, 0), template)
-        
-        # 6. เขียนพาดหัว (จัดกึ่งกลางอัตโนมัติ)
-        draw = ImageDraw.Draw(final_image)
-        # ตรวจสอบว่ามีไฟล์ฟอนต์ไหม ถ้าไม่มีจะใช้ฟอนต์ระบบแทน
-        try:
-            font = ImageFont.truetype("font.ttf", FONT_SIZE)
-        except:
-            font = ImageFont.load_default()
-            print("Warning: font.ttf not found, using default font.")
-
-        # คำนวณหาจุดกึ่งกลางของข้อความ
-        bbox = draw.textbbox((0, 0), title, font=font)
-        text_width = bbox[2] - bbox[0]
-        center_text_x = (t_width - text_width) // 2
-        
-        # วาดข้อความลงบนภาพ
-        draw.text((center_text_x, TEXT_Y_POSITION), title, font=font, fill=TEXT_COLOR)
-
-        # 7. ส่งไฟล์กลับ
-        with io.BytesIO() as image_binary:
-            final_image.save(image_binary, 'PNG')
-            image_binary.seek(0)
-            await ctx.send(file=discord.File(fp=image_binary, filename='gamecraftsman_cover.png'))
-
+        font = ImageFont.truetype("font.ttf", FONT_SIZE)
+        draw_styled_text(draw, title, font, TEXT_Y_POSITION, t_width, MAIN_COLOR, HIGHLIGHT_COLOR)
     except Exception as e:
-        await ctx.send(f"เกิดข้อผิดพลาดหลังบ้าน: {str(e)}")
         print(f"Error: {e}")
 
-# เริ่มรันระบบ
-if __name__ == "__main__":
-    keep_alive() # เปิดเว็บหลอกสำหรับ Render.com
-    
-    # ดึง Token จาก Environment Variable ที่ตั้งไว้ใน Render
-    token = os.environ.get('TOKEN')
-    if token:
-        bot.run(token)
-    else:
-        print("Error: No TOKEN found in environment variables.")
+    with io.BytesIO() as image_binary:
+        final_image.save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='cover.png'))
+
+keep_alive()
+bot.run(os.environ.get('TOKEN'))
