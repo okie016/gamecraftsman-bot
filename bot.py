@@ -20,11 +20,11 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
-    # --- [ส่วนตั้งค่าดีไซน์ - แก้ตรงนี้ได้เลย] ---
-    FONT_SIZE = 87             
-    TEXT_Y_POSITION = 1090      # ปรับความสูงต่ำที่ตัวเลขนี้
+    # --- [ตั้งค่าดีไซน์ - แก้พิกัด Y ที่นี่] ---
+    FONT_SIZE = 80             
+    TEXT_Y_POSITION = 850      # ความสูงต่ำของข้อความ
     MAIN_COLOR = (255, 255, 255, 255)      
-    HIGHLIGHT_COLOR = (188, 234, 47, 255)   # สีเหลืองทอง
+    HIGHLIGHT_COLOR = (255, 215, 0, 255)   # สีเหลืองทอง
     # -------------------------------------
 
     if not ctx.message.attachments:
@@ -50,22 +50,20 @@ async def make_cover(ctx, *, title: str):
     final_image.paste(user_image, (offset_x, 0))
     final_image.paste(template, (0, 0), template)
     
-    # 2. ระบบวาดข้อความ (Alignment Fix)
+    # 2. ระบบวาดข้อความ (Alignment Center Fix)
     draw = ImageDraw.Draw(final_image)
     try:
         font = ImageFont.truetype("font.ttf", FONT_SIZE)
         
-        # ลบ Tag ออกเพื่อคำนวณความกว้างของข้อความเพียวๆ
+        # ลบ Tag ออกเพื่อหาความกว้างของประโยคทั้งหมด
         clean_text = title.replace('[color]', '').replace('[/color]', '')
-        
-        # วัดขนาดข้อความทั้งหมดแบบก้อนเดียว (กลับมาใช้การวัดมาตรฐานที่เสถียรที่สุด)
         bbox = draw.textbbox((0, 0), clean_text, font=font)
-        total_text_width = bbox[2] - bbox[0]
+        total_width = bbox[2] - bbox[0]
+
+        # จุดเริ่มต้นวาด (X) เพื่อให้ก้อนทั้งหมดอยู่กลางภาพพอดี
+        current_x = (t_width - total_width) // 2
         
-        # จุดเริ่มวาด X เพื่อให้ก้อนทั้งหมดอยู่กลางภาพพอดี
-        current_x = (t_width - total_text_width) // 2
-        
-        # แยกส่วนเพื่อวาดทีละสี
+        # แยกชิ้นส่วนเพื่อวาดทีละสี
         parts = re.split(r'(\[color\].*?\[/color\])', title)
         for part in parts:
             if not part: continue
@@ -77,12 +75,12 @@ async def make_cover(ctx, *, title: str):
                 content = part
                 color = MAIN_COLOR
             
-            # วาดข้อความส่วนนั้นๆ
+            # วาดข้อความต่อเนื่อง (ใช้จุดเริ่มจาก current_x)
             draw.text((current_x, TEXT_Y_POSITION), content, font=font, fill=color)
             
-            # ขยับพิกัด X ไปข้างหน้าตามความกว้างของส่วนที่เพิ่งวาด
-            part_bbox = draw.textbbox((0, 0), content, font=font)
-            current_x += (part_bbox[2] - part_bbox[0])
+            # อัปเดตพิกัด X โดยการวัดความกว้างของข้อความที่เพิ่งวาดไป
+            p_bbox = draw.textbbox((0, 0), content, font=font)
+            current_x += (p_bbox[2] - p_bbox[0])
             
     except Exception as e:
         print(f"Render Error: {e}")
@@ -92,6 +90,5 @@ async def make_cover(ctx, *, title: str):
         image_binary.seek(0)
         await ctx.send(file=discord.File(fp=image_binary, filename='cover.png'))
 
-if __name__ == "__main__":
-    keep_alive()
-    bot.run(os.environ.get('TOKEN'))
+keep_alive()
+bot.run(os.environ.get('TOKEN'))
