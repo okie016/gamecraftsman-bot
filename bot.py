@@ -21,10 +21,10 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
     # --- [ตั้งค่าดีไซน์ - แก้พิกัด Y ที่นี่] ---
-    FONT_SIZE = 80             
-    TEXT_Y_POSITION = 850      # ความสูงต่ำของข้อความ
+    FONT_SIZE = 87             
+    TEXT_Y_POSITION = 1090      # ความสูงต่ำของข้อความ
     MAIN_COLOR = (255, 255, 255, 255)      
-    HIGHLIGHT_COLOR = (255, 215, 0, 255)   # สีเหลืองทอง
+    HIGHLIGHT_COLOR = (188, 234, 47, 255)  # สีเหลืองทอง
     # -------------------------------------
 
     if not ctx.message.attachments:
