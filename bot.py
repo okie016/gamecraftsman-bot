@@ -18,26 +18,13 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-def get_styled_parts(text):
-    """แยกข้อความออกมาเป็น list ของ (text, is_highlight)"""
-    parts = []
-    # Regex สำหรับจับคู่ [color]ข้อความ[/color]
-    segments = re.split(r'(\[color\].*?\[/color\])', text)
-    for seg in segments:
-        if seg.startswith('[color]') and seg.endswith('[/color]'):
-            content = seg.replace('[color]', '').replace('[/color]', '')
-            parts.append((content, True))
-        elif seg:
-            parts.append((seg, False))
-    return parts
-
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
     # --- [ตั้งค่าดีไซน์] ---
-    FONT_SIZE = 87
-    TEXT_Y_POSITION = 1090
+    FONT_SIZE = 80
+    TEXT_Y_POSITION = 850      # กำหนดแค่ความสูง (แกน Y) ส่วนแกน X จะกลางเป๊ะๆ
     MAIN_COLOR = (255, 255, 255, 255)      
-    HIGHLIGHT_COLOR = (188, 234, 47, 255)   # สีเหลืองทอง
+    HIGHLIGHT_COLOR = (188, 234, 47, 255)
     # -------------------
 
     if not ctx.message.attachments:
@@ -63,33 +50,39 @@ async def make_cover(ctx, *, title: str):
     final_image.paste(user_image, (offset_x, 0))
     final_image.paste(template, (0, 0), template)
     
-    # 2. ระบบวาดข้อความ (ใหม่หมด)
+    # 2. ระบบวาดข้อความ (Alignment Fix)
     draw = ImageDraw.Draw(final_image)
     try:
         font = ImageFont.truetype("font.ttf", FONT_SIZE)
-        parts = get_styled_parts(title)
         
-        # คำนวณความกว้างรวมของทุกส่วนก่อน
+        # แยกส่วนข้อความ [color]...[/color]
+        parts = re.split(r'(\[color\].*?\[/color\])', title)
+        
+        # คำนวณหาความกว้างรวมของ "ทุกส่วน" ก่อนเริ่มวาด
         total_width = 0
-        prepared_parts = []
-        for content, is_hl in parts:
-            # ใช้พารามิเตอร์เพื่อให้วัดค่าภาษาไทยได้แม่นขึ้น
-            bbox = draw.textbbox((0, 0), content, font=font)
-            w = bbox[2] - bbox[0]
-            total_width += w
-            prepared_parts.append({
-                'text': content, 
-                'color': HIGHLIGHT_COLOR if is_hl else MAIN_COLOR, 
-                'width': w
-            })
+        render_data = []
+        for part in parts:
+            if part.startswith('[color]') and part.endswith('[/color]'):
+                content = part.replace('[color]', '').replace('[/color]', '')
+                color = HIGHLIGHT_COLOR
+            else:
+                content = part
+                color = MAIN_COLOR
+            
+            if content:
+                # วัดขนาดแต่ละส่วน (ใช้ anchor='lt' เพื่อความแม่นยำ)
+                bbox = draw.textbbox((0, 0), content, font=font, anchor='lt')
+                w = bbox[2] - bbox[0]
+                total_width += w
+                render_data.append({'text': content, 'color': color, 'width': w})
 
-        # จุดเริ่มวาด X เพื่อให้ก้อนทั้งหมดอยู่กลางภาพพอดี
+        # จุดเริ่มวาด X ที่ทำให้ "ก้อนทั้งหมด" อยู่กลางภาพพอดี
         current_x = (t_width - total_width) // 2
         
-        for p in prepared_parts:
-            # วาดทีละส่วนต่อกัน
-            draw.text((current_x, TEXT_Y_POSITION), p['text'], font=font, fill=p['color'])
-            current_x += p['width']
+        for item in render_data:
+            # วาดต่อกันไปเรื่อยๆ โดยใช้จุดเริ่มจากกึ่งกลางที่คำนวณไว้
+            draw.text((current_x, TEXT_Y_POSITION), item['text'], font=font, fill=item['color'], anchor='lt')
+            current_x += item['width']
             
     except Exception as e:
         print(f"Render Error: {e}")
@@ -99,6 +92,5 @@ async def make_cover(ctx, *, title: str):
         image_binary.seek(0)
         await ctx.send(file=discord.File(fp=image_binary, filename='cover.png'))
 
-if __name__ == "__main__":
-    keep_alive()
-    bot.run(os.environ.get('TOKEN'))
+keep_alive()
+bot.run(os.environ.get('TOKEN'))
