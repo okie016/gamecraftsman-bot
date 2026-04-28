@@ -18,43 +18,26 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-def draw_styled_text(draw, text, font, y_position, container_width, default_color, highlight_color):
-    """ฟังก์ชันวาดข้อความแยกสีและจัดกึ่งกลางบรรทัดเดียว"""
-    # แยกส่วนประกอบด้วย Tag [color]...[/color]
-    parts = re.split(r'(\[color\].*?\[/color\])', text)
-    
-    # 1. คำนวณความกว้างรวมทั้งหมดก่อนเพื่อหาจุดเริ่มวางให้กึ่งกลาง
-    total_width = 0
-    display_parts = []
-    
-    for part in parts:
-        if part.startswith('[color]') and part.endswith('[/color]'):
-            content = part.replace('[color]', '').replace('[/color]', '')
-            color = highlight_color
-        else:
-            content = part
-            color = default_color
-        
-        if content:
-            bbox = draw.textbbox((0, 0), content, font=font)
-            w = bbox[2] - bbox[0]
-            total_width += w
-            display_parts.append({'text': content, 'color': color, 'width': w})
-
-    # 2. เริ่มวาดจากจุดที่ทำให้ก้อนทั้งหมดอยู่กลางภาพ
-    current_x = (container_width - total_width) // 2
-    
-    for p in display_parts:
-        draw.text((current_x, y_position), p['text'], font=font, fill=p['color'])
-        current_x += p['width']
+def get_styled_parts(text):
+    """แยกข้อความออกมาเป็น list ของ (text, is_highlight)"""
+    parts = []
+    # Regex สำหรับจับคู่ [color]ข้อความ[/color]
+    segments = re.split(r'(\[color\].*?\[/color\])', text)
+    for seg in segments:
+        if seg.startswith('[color]') and seg.endswith('[/color]'):
+            content = seg.replace('[color]', '').replace('[/color]', '')
+            parts.append((content, True))
+        elif seg:
+            parts.append((seg, False))
+    return parts
 
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
     # --- [ตั้งค่าดีไซน์] ---
-    FONT_SIZE = 80
-    TEXT_Y_POSITION = 1100
-    MAIN_COLOR = (255, 255, 255, 255)      # สีขาว
-    HIGHLIGHT_COLOR = (188, 234, 47, 255)   # สีทอง (ปรับเปลี่ยนได้ตามใจชอบ)
+    FONT_SIZE = 87
+    TEXT_Y_POSITION = 1090
+    MAIN_COLOR = (255, 255, 255, 255)      
+    HIGHLIGHT_COLOR = (188, 234, 47, 255)   # สีเหลืองทอง
     # -------------------
 
     if not ctx.message.attachments:
@@ -70,7 +53,7 @@ async def make_cover(ctx, *, title: str):
     template = Image.open("template.png").convert("RGBA")
     t_width, t_height = template.size
 
-    # จัดการรูปพื้นหลัง
+    # 1. จัดการรูปพื้นหลัง (Center & Fit)
     ratio = t_height / user_image.height
     new_width = int(user_image.width * ratio)
     user_image = user_image.resize((new_width, t_height), Image.Resampling.LANCZOS)
@@ -80,18 +63,42 @@ async def make_cover(ctx, *, title: str):
     final_image.paste(user_image, (offset_x, 0))
     final_image.paste(template, (0, 0), template)
     
-    # วาดข้อความด้วยระบบ Styled Text
+    # 2. ระบบวาดข้อความ (ใหม่หมด)
     draw = ImageDraw.Draw(final_image)
     try:
         font = ImageFont.truetype("font.ttf", FONT_SIZE)
-        draw_styled_text(draw, title, font, TEXT_Y_POSITION, t_width, MAIN_COLOR, HIGHLIGHT_COLOR)
+        parts = get_styled_parts(title)
+        
+        # คำนวณความกว้างรวมของทุกส่วนก่อน
+        total_width = 0
+        prepared_parts = []
+        for content, is_hl in parts:
+            # ใช้พารามิเตอร์เพื่อให้วัดค่าภาษาไทยได้แม่นขึ้น
+            bbox = draw.textbbox((0, 0), content, font=font)
+            w = bbox[2] - bbox[0]
+            total_width += w
+            prepared_parts.append({
+                'text': content, 
+                'color': HIGHLIGHT_COLOR if is_hl else MAIN_COLOR, 
+                'width': w
+            })
+
+        # จุดเริ่มวาด X เพื่อให้ก้อนทั้งหมดอยู่กลางภาพพอดี
+        current_x = (t_width - total_width) // 2
+        
+        for p in prepared_parts:
+            # วาดทีละส่วนต่อกัน
+            draw.text((current_x, TEXT_Y_POSITION), p['text'], font=font, fill=p['color'])
+            current_x += p['width']
+            
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Render Error: {e}")
 
     with io.BytesIO() as image_binary:
         final_image.save(image_binary, 'PNG')
         image_binary.seek(0)
         await ctx.send(file=discord.File(fp=image_binary, filename='cover.png'))
 
-keep_alive()
-bot.run(os.environ.get('TOKEN'))
+if __name__ == "__main__":
+    keep_alive()
+    bot.run(os.environ.get('TOKEN'))
