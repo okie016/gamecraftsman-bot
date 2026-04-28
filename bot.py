@@ -21,8 +21,8 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
     # --- [ตั้งค่าดีไซน์] ---
-    FONT_SIZE = 80
-    TEXT_Y_POSITION = 850      # กำหนดแค่ความสูง (แกน Y) ส่วนแกน X จะกลางเป๊ะๆ
+    FONT_SIZE = 87
+    TEXT_Y_POSITION = 1090      # กำหนดแค่ความสูง (แกน Y) ส่วนแกน X จะกลางเป๊ะๆ
     MAIN_COLOR = (255, 255, 255, 255)      
     HIGHLIGHT_COLOR = (188, 234, 47, 255)
     # -------------------
