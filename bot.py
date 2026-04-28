@@ -22,7 +22,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def make_cover(ctx, *, title: str):
     # --- [ส่วนตั้งค่าดีไซน์] ---
     FONT_SIZE = 87             
-    TEXT_Y_POSITION = 1090     
+    TEXT_Y_POSITION = 1090      
     MAIN_COLOR = (255, 255, 255, 255)      # สีขาว
     HIGHLIGHT_COLOR = (188, 234, 47, 255)   # สีเหลืองทอง
     # -----------------------
@@ -49,41 +49,49 @@ async def make_cover(ctx, *, title: str):
     final_image.paste(user_image, (offset_x, 0))
     final_image.paste(template, (0, 0), template)
     
-    # 2. ระบบวาดข้อความ (Multi-Color Layering Logic)
+    # 2. ระบบวาดข้อความ (Fixed Align Center & Color Logic)
     draw = ImageDraw.Draw(final_image)
     try:
         font = ImageFont.truetype("font.ttf", FONT_SIZE)
 
-        # เตรียมข้อความ: 1.แบบเพียวๆ 2.แบบเว้นช่องว่างเพื่อเตรียมทับสี
-        clean_text = title.replace('[color]', '').replace('[/color]', '')
+        # แยกข้อความเป็นส่วนๆ เพื่อหาความกว้างรวม (สำหรับการ Align Center)
+        # Regex นี้จะช่วยแยกส่วนที่เป็น [color] ออกจากข้อความปกติ
+        parts_data = []
+        full_clean_text = ""
         
-        # หาจุดกึ่งกลางของข้อความทั้งหมด
-        bbox = draw.textbbox((0, 0), clean_text, font=font)
-        text_width = bbox[2] - bbox[0]
-        start_x = (t_width - text_width) // 2
-
-        # ขั้นตอนที่ A: วาดข้อความทั้งหมดเป็นสีขาว (MAIN_COLOR) ไว้ก่อน
-        draw.text((start_x, TEXT_Y_POSITION), clean_text, font=font, fill=MAIN_COLOR)
-
-        # ขั้นตอนที่ B: วาดสี HIGHLIGHT ทับเฉพาะส่วนที่อยู่ใน [color]
-        # เราจะใช้วิธีหาตำแหน่งของคำในประโยคเพื่อวาดให้ตรงล็อค
-        current_x_offset = start_x
-        parts = re.split(r'(\[color\].*?\[/color\])', title)
+        raw_parts = re.split(r'(\[color\].*?\[/color\])', title)
         
-        for part in parts:
+        total_text_width = 0
+        for part in raw_parts:
             if not part: continue
             
+            is_highlight = False
+            content = part
             if part.startswith('[color]') and part.endswith('[/color]'):
                 content = part.replace('[color]', '').replace('[/color]', '')
-                # วาดทับลงไปในตำแหน่งปัจจุบัน
-                draw.text((current_x_offset, TEXT_Y_POSITION), content, font=font, fill=HIGHLIGHT_COLOR)
-                measured_text = content
-            else:
-                measured_text = part
+                is_highlight = True
             
-            # ขยับ Offset ตามความกว้างของข้อความที่ผ่านไป
-            p_bbox = draw.textbbox((0, 0), measured_text, font=font)
-            current_x_offset += (p_bbox[2] - p_bbox[0])
+            # คำนวณความกว้างของส่วนนี้
+            bbox = draw.textbbox((0, 0), content, font=font)
+            part_width = bbox[2] - bbox[0]
+            
+            parts_data.append({
+                'content': content,
+                'width': part_width,
+                'is_highlight': is_highlight
+            })
+            total_text_width += part_width
+
+        # หาจุดเริ่มวาด x เพื่อให้ทั้งประโยคอยู่ตรงกลาง
+        current_x = (t_width - total_text_width) // 2
+
+        # เริ่มวาดทีละส่วนต่อกัน
+        for p in parts_data:
+            text_color = HIGHLIGHT_COLOR if p['is_highlight'] else MAIN_COLOR
+            # วาดข้อความ
+            draw.text((current_x, TEXT_Y_POSITION), p['content'], font=font, fill=text_color)
+            # ขยับตำแหน่ง x ไปข้างหน้าตามความกว้างของข้อความที่เพิ่งวาด
+            current_x += p['width']
             
     except Exception as e:
         print(f"Render Error: {e}")
