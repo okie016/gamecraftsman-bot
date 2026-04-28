@@ -28,9 +28,9 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def make_cover(ctx, *, title: str):
 
     # -------- Design Config --------
-    FONT_SIZE = 87
+    FONT_SIZE = 90
     LINE_SPACING = 20
-    START_Y = 1090
+    START_Y = 990
 
     MAIN_COLOR = (255, 255, 255, 255)
     HIGHLIGHT_COLOR = (188, 234, 47, 255)
