@@ -28,8 +28,8 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
     # --- [ส่วนตั้งค่าดีไซน์ - ปรับแก้ตรงนี้ได้เลย] ---
-    FONT_SIZE = 80             # ขนาดตัวอักษร
-    TEXT_Y_POSITION = 850      # ระยะห่างจากขอบบน (แกน Y) ส่วนแกน X จะจัดกลางให้อัตโนมัติ
+    FONT_SIZE = 87             # ขนาดตัวอักษร
+    TEXT_Y_POSITION = 1936.9204      # ระยะห่างจากขอบบน (แกน Y) ส่วนแกน X จะจัดกลางให้อัตโนมัติ
     TEXT_COLOR = (255, 255, 255, 255) # สีขาว (RGBA)
     # ------------------------------------------
 
