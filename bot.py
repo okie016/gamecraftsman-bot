@@ -29,7 +29,7 @@ async def make_cover(ctx, *, title: str):
 
     # -------- Design Config --------
     FONT_SIZE = 95
-    LINE_SPACING = 20
+    LINE_SPACING = 24
     START_Y = 990
 
     MAIN_COLOR = (255, 255, 255, 255)
