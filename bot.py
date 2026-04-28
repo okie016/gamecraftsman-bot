@@ -28,7 +28,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 async def make_cover(ctx, *, title: str):
 
     # -------- Design Config --------
-    FONT_SIZE = 90
+    FONT_SIZE = 95
     LINE_SPACING = 20
     START_Y = 990
 
