@@ -35,7 +35,7 @@ async def make_cover(ctx, *, title: str):
     MAIN_COLOR = (255, 255, 255, 255)
     HIGHLIGHT_COLOR = (188, 234, 47, 255)
 
-    TARGET_SIZE = (1416, 1476)  # 👈 บังคับสัดส่วนตรงนี้
+    TARGET_SIZE = (1200, 1500)  # 👈 บังคับสัดส่วนตรงนี้
 
     # -----------------------
 
