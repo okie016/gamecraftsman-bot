@@ -23,11 +23,11 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# ------------------ Cover Command ------------------
+# ------------------ Command ------------------
 @bot.command(name="ทำปก")
 async def make_cover(ctx, *, title: str):
 
-    # -------- Design Config --------
+    # -------- Config --------
     FONT_SIZE = 95
     LINE_SPACING = 26
     START_Y = 990
@@ -35,7 +35,9 @@ async def make_cover(ctx, *, title: str):
     MAIN_COLOR = (255, 255, 255, 255)
     HIGHLIGHT_COLOR = (188, 234, 47, 255)
 
-    # --------------------------------
+    TARGET_SIZE = (1416, 1476)  # 👈 บังคับสัดส่วนตรงนี้
+
+    # -----------------------
 
     if not ctx.message.attachments:
         await ctx.send("ลืมแนบรูปครับ!")
@@ -43,7 +45,7 @@ async def make_cover(ctx, *, title: str):
 
     attachment = ctx.message.attachments[0]
 
-    # -------- Load User Image --------
+    # -------- Load Image --------
     async with aiohttp.ClientSession() as session:
         async with session.get(attachment.url) as resp:
             data = io.BytesIO(await resp.read())
@@ -51,9 +53,11 @@ async def make_cover(ctx, *, title: str):
 
     # -------- Load Template --------
     template = Image.open("template.png").convert("RGBA")
+    template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
+
     t_width, t_height = template.size
 
-    # -------- Cover + Center Crop --------
+    # -------- Cover Crop --------
     img_ratio = user_image.width / user_image.height
     template_ratio = t_width / t_height
 
@@ -79,7 +83,7 @@ async def make_cover(ctx, *, title: str):
     final_image = Image.new("RGBA", (t_width, t_height))
     final_image.paste(cropped, (0, 0))
 
-    # -------- Overlay Template --------
+    # -------- Apply Template (Mask) --------
     final_image.paste(template, (0, 0), template)
 
     # -------- Draw Text --------
@@ -88,13 +92,11 @@ async def make_cover(ctx, *, title: str):
     try:
         font = ImageFont.truetype("font.ttf", FONT_SIZE)
 
-        # แยกหลายบรรทัด (รองรับ Enter)
         lines = title.split("\n")
         current_y = START_Y
 
         for line in lines:
 
-            # --- แยก [color] ---
             parts_raw = re.split(r'(\[color\].*?\[/color\])', line)
 
             parts = []
@@ -108,7 +110,6 @@ async def make_cover(ctx, *, title: str):
                 else:
                     parts.append((part, MAIN_COLOR))
 
-            # --- คำนวณความกว้าง ---
             total_width = 0
             widths = []
 
@@ -118,11 +119,9 @@ async def make_cover(ctx, *, title: str):
                 widths.append(w)
                 total_width += w
 
-            # --- center ---
             start_x = (t_width - total_width) // 2
             current_x = start_x
 
-            # --- draw ทีละ segment ---
             for i, (text, color) in enumerate(parts):
                 draw.text(
                     (current_x, current_y),
@@ -134,17 +133,21 @@ async def make_cover(ctx, *, title: str):
                 )
                 current_x += widths[i]
 
-            # --- ขยับลงบรรทัดถัดไป ---
             current_y += FONT_SIZE + LINE_SPACING
 
     except Exception as e:
         print("Text Error:", e)
 
-    # -------- Send Back --------
+    # -------- 🔥 FIX: Convert to JPG --------
+    # เอา alpha ออก → ไม่โปร่งใสอีก
+    background = Image.new("RGB", final_image.size, (20, 20, 20))  # สีพื้นหลัง
+    background.paste(final_image, mask=final_image.split()[3])
+
+    # -------- Send --------
     with io.BytesIO() as buffer:
-        final_image.save(buffer, "PNG")
+        background.save(buffer, "JPEG", quality=95)
         buffer.seek(0)
-        await ctx.send(file=discord.File(buffer, "cover.png"))
+        await ctx.send(file=discord.File(buffer, "cover.jpg"))
 
 # ------------------ Run ------------------
 keep_alive()
