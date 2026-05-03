@@ -128,7 +128,7 @@ async def make_cover(ctx, *, title: str):
                     text,
                     font=font,
                     fill=color,
-                    stroke_width=2,
+                    stroke_width=0,
                     stroke_fill=(0, 0, 0)
                 )
                 current_x += widths[i]
