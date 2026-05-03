@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 from PIL import Image, ImageDraw, ImageFont
-import io, aiohttp, asyncio, os, re, requests, base64
+import io, os, re, requests
 
 app = Flask('')
 
@@ -99,20 +99,22 @@ def home():
     return "GameCraftsman Render API is Live!"
 
 
-@app.route('/render', methods=['POST'])
+@app.route('/render', methods=['GET', 'POST'])
 def render():
     """
-    POST /render
-    {
-        "image_url": "https://...",
-        "headline":  "พาดหัว\nบรรทัดสอง\n[color]เน้นสี[/color]"
-    }
+    GET  /render?image_url=https://...&headline=บรรทัด1|บรรทัด2
+    POST /render  { "image_url": "...", "headline": "บรรทัด1\nบรรทัด2" }
+
+    หมายเหตุ: GET ใช้ | แทน \n สำหรับขึ้นบรรทัดใหม่
     Returns: JPEG image
     """
-    body = request.get_json(force=True, silent=True) or {}
-
-    image_url = body.get('image_url', '').strip()
-    headline  = body.get('headline', '').strip()
+    if request.method == 'GET':
+        image_url = request.args.get('image_url', '').strip()
+        headline  = request.args.get('headline', '').strip().replace('|', '\n')
+    else:
+        body      = request.get_json(force=True, silent=True) or {}
+        image_url = body.get('image_url', '').strip()
+        headline  = body.get('headline', '').strip()
 
     if not image_url:
         return jsonify({"error": "image_url is required"}), 400
