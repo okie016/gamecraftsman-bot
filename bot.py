@@ -156,7 +156,7 @@ async def make_cover_2(ctx, *, title: str):
     FONT_SIZE = 78
     LINE_SPACING = 22
     START_X = 85  # ปรับระยะห่างจากขอบซ้ายตรงนี้
-    START_Y = 1100
+    START_Y = 970
 
     # เพิ่ม Setting สำหรับปรับขนาดภาพ (1.0 = พอดีกรอบแบบไม่โดนตัด 0.8 = ย่อลง 80% 1.2 = ขยาย 120%)
     IMAGE_SCALE = 1.2
@@ -196,13 +196,11 @@ async def make_cover_2(ctx, *, title: str):
     img_ratio = user_image.width / user_image.height
     template_ratio = t_width / t_height
 
-    # คำนวณ Scale ย่อภาพให้เห็นเต็มรูปโดยไม่โดนตัด 
     if img_ratio > template_ratio:
         base_scale = t_width / user_image.width
     else:
         base_scale = t_height / user_image.height
 
-    # นำมาคูณกับ Setting ขนาดภาพที่ตั้งไว้
     final_scale = base_scale * IMAGE_SCALE
 
     new_size = (
@@ -214,11 +212,10 @@ async def make_cover_2(ctx, *, title: str):
 
     final_image = Image.new("RGBA", (t_width, t_height))
 
-    # คำนวณตำแหน่งวางภาพให้อยู่ตรงกลาง และบวกค่าเลื่อน (Shift)
+    # ---- แก้ไขให้ชิดบนตรงนี้ ----
     paste_x = ((t_width - resized.width) // 2) + IMAGE_SHIFT_X
-    paste_y = ((t_height - resized.height) // 2) + IMAGE_SHIFT_Y
+    paste_y = 0 + IMAGE_SHIFT_Y # บังคับให้แกน Y เริ่มที่ 0 เพื่อให้ชิดบน
 
-    # วางภาพลงไปโดยไม่มีการครอป
     final_image.paste(resized, (paste_x, paste_y))
 
     # -------- Apply Template (Mask) --------
