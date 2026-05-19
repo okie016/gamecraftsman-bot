@@ -153,10 +153,10 @@ async def make_cover(ctx, *, title: str):
 async def make_cover_2(ctx, *, title: str):
 
     # -------- Config สำหรับ Template 2 --------
-    FONT_SIZE = 72
+    FONT_SIZE = 77
     LINE_SPACING = 20
     START_X = 82  # ปรับระยะห่างจากขอบซ้ายตรงนี้
-    START_Y = 1100
+    START_Y = 1200
 
     # เพิ่ม Setting สำหรับปรับขนาดภาพ (1.0 = พอดีกรอบแบบไม่โดนตัด 0.8 = ย่อลง 80% 1.2 = ขยาย 120%)
     IMAGE_SCALE = 1.5
