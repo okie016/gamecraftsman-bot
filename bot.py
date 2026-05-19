@@ -155,19 +155,17 @@ async def make_cover_2(ctx, *, title: str):
     # -------- Config สำหรับ Template 2 --------
     FONT_SIZE = 95
     LINE_SPACING = 24
-    START_Y = 1100  # ปรับตำแหน่ง Y ของข้อความ (เลขยิ่งมากยิ่งอยู่ต่ำ)
+    START_X = 100  # ปรับระยะห่างจากขอบซ้ายตรงนี้
+    START_Y = 1100
 
-    # การเลื่อนตำแหน่งภาพข่าว (อ้างอิงจากการครอป)
-    # หากช่องใสของ template2 อยู่ต่ำลง คุณอาจต้องปรับค่า Y เป็นบวกเพื่อเลื่อนกรอบครอปภาพตามลงมา
     IMAGE_SHIFT_X = 0  
     IMAGE_SHIFT_Y = 0  
 
     MAIN_COLOR = (255, 255, 255, 255)
     HIGHLIGHT_COLOR = (188, 234, 47, 255)
 
-    TARGET_SIZE = (1200, 1500)  # สัดส่วนปก 2
+    TARGET_SIZE = (1200, 1500)
 
-    # ชื่อไฟล์ที่เปลี่ยนไป
     TEMPLATE_FILE = "template2.png"
     FONT_FILE = "font.ttf"
     # -----------------------
@@ -206,13 +204,11 @@ async def make_cover_2(ctx, *, title: str):
 
     resized = user_image.resize(new_size, Image.Resampling.LANCZOS)
 
-    # คำนวณตำแหน่งครอปภาพและบวกค่าเลื่อนภาพเข้าไป
     left = ((resized.width - t_width) // 2) + IMAGE_SHIFT_X
     top = ((resized.height - t_height) // 2) + IMAGE_SHIFT_Y
     right = left + t_width
     bottom = top + t_height
 
-    # ป้องกันการครอปทะลุขอบภาพ
     if left < 0: left = 0
     if top < 0: top = 0
     if right > resized.width: right = resized.width
@@ -221,7 +217,6 @@ async def make_cover_2(ctx, *, title: str):
     cropped = resized.crop((left, top, right, bottom))
 
     final_image = Image.new("RGBA", (t_width, t_height))
-    # วางภาพไว้ตรงกลาง
     paste_x = (t_width - cropped.width) // 2
     paste_y = (t_height - cropped.height) // 2
     final_image.paste(cropped, (paste_x, paste_y))
@@ -253,17 +248,7 @@ async def make_cover_2(ctx, *, title: str):
                 else:
                     parts.append((part, MAIN_COLOR))
 
-            total_width = 0
-            widths = []
-
-            for text, _ in parts:
-                bbox = draw.textbbox((0, 0), text, font=font)
-                w = bbox[2] - bbox[0]
-                widths.append(w)
-                total_width += w
-
-            start_x = (t_width - total_width) // 2
-            current_x = start_x
+            current_x = START_X  # บังคับให้ข้อความเริ่มที่ตำแหน่ง X ที่ตั้งค่าไว้เพื่อชิดซ้าย
 
             for i, (text, color) in enumerate(parts):
                 draw.text(
@@ -274,12 +259,14 @@ async def make_cover_2(ctx, *, title: str):
                     stroke_width=0,
                     stroke_fill=(0, 0, 0)
                 )
-                current_x += widths[i]
+                bbox = draw.textbbox((0, 0), text, font=font)
+                w = bbox[2] - bbox[0]
+                current_x += w  # ขยับจุดวาดข้อความชิ้นต่อไป
 
             current_y += FONT_SIZE + LINE_SPACING
 
     except Exception as e:
-        print("Text Error:", e)
+        print("Text Error e")
 
     # -------- FIX Convert to JPG --------
     background = Image.new("RGB", final_image.size, (20, 20, 20))
