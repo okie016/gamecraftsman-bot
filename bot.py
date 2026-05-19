@@ -156,7 +156,7 @@ async def make_cover_2(ctx, *, title: str):
     FONT_SIZE = 78
     LINE_SPACING = 22
     START_X = 85  # ปรับระยะห่างจากขอบซ้ายตรงนี้
-    START_Y = 970
+    START_Y = 1090
 
     # เพิ่ม Setting สำหรับปรับขนาดภาพ (1.0 = พอดีกรอบแบบไม่โดนตัด 0.8 = ย่อลง 80% 1.2 = ขยาย 120%)
     IMAGE_SCALE = 1.2
