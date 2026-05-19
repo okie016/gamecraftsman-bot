@@ -159,7 +159,7 @@ async def make_cover_2(ctx, *, title: str):
     START_Y = 1200
 
     # เพิ่ม Setting สำหรับปรับขนาดภาพ (1.0 = พอดีกรอบแบบไม่โดนตัด 0.8 = ย่อลง 80% 1.2 = ขยาย 120%)
-    IMAGE_SCALE = 0.96
+    IMAGE_SCALE = 1.0
 
     # เลื่อนตำแหน่งภาพ
     IMAGE_SHIFT_X = 0  
