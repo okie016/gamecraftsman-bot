@@ -1,4 +1,3 @@
-นี่คือโค้ดทั้งหมดที่รวมคำสั่ง !ทำปก และ !ทำปก2 เข้าด้วยกันเรียบร้อยแล้วครับ คุณสามารถนำโค้ดชุดนี้ไปวางทับในไฟล์ bot.py ได้เลยเพื่อความปลอดภัยและป้องกันการวางตำแหน่งผิดพลาดครับ
 import discord
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
