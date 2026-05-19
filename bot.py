@@ -156,14 +156,14 @@ async def make_cover_2(ctx, *, title: str):
     FONT_SIZE = 78
     LINE_SPACING = 22
     START_X = 90  # ปรับระยะห่างจากขอบซ้ายตรงนี้
-    START_Y = 1000
+    START_Y = 1300
 
     # เพิ่ม Setting สำหรับปรับขนาดภาพ (1.0 = พอดีกรอบแบบไม่โดนตัด 0.8 = ย่อลง 80% 1.2 = ขยาย 120%)
-    IMAGE_SCALE = 1.0
+    IMAGE_SCALE = 1.2
 
     # เลื่อนตำแหน่งภาพ
     IMAGE_SHIFT_X = 0  
-    IMAGE_SHIFT_Y = 20  
+    IMAGE_SHIFT_Y = 200  
 
     MAIN_COLOR = (255, 255, 255, 255)
     HIGHLIGHT_COLOR = (188, 234, 47, 255)
