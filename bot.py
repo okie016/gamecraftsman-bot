@@ -153,11 +153,15 @@ async def make_cover(ctx, *, title: str):
 async def make_cover_2(ctx, *, title: str):
 
     # -------- Config สำหรับ Template 2 --------
-    FONT_SIZE = 95
-    LINE_SPACING = 24
-    START_X = 100  # ปรับระยะห่างจากขอบซ้ายตรงนี้
-    START_Y = 1100
+    FONT_SIZE = 80
+    LINE_SPACING = 22
+    START_X = 90  # ปรับระยะห่างจากขอบซ้ายตรงนี้
+    START_Y = 1200
 
+    # เพิ่ม Setting สำหรับปรับขนาดภาพ (1.0 = พอดีกรอบแบบไม่โดนตัด 0.8 = ย่อลง 80% 1.2 = ขยาย 120%)
+    IMAGE_SCALE = 0.8
+
+    # เลื่อนตำแหน่งภาพ
     IMAGE_SHIFT_X = 0  
     IMAGE_SHIFT_Y = 0  
 
@@ -167,7 +171,7 @@ async def make_cover_2(ctx, *, title: str):
     TARGET_SIZE = (1200, 1500)
 
     TEMPLATE_FILE = "template2.png"
-    FONT_FILE = "font.ttf"
+    FONT_FILE = "font2.otf"
     # -----------------------
 
     if not ctx.message.attachments:
@@ -188,38 +192,34 @@ async def make_cover_2(ctx, *, title: str):
 
     t_width, t_height = template.size
 
-    # -------- Cover Crop --------
+    # -------- Resize Image (Not Fit/Crop) --------
     img_ratio = user_image.width / user_image.height
     template_ratio = t_width / t_height
 
+    # คำนวณ Scale ย่อภาพให้เห็นเต็มรูปโดยไม่โดนตัด 
     if img_ratio > template_ratio:
-        scale = t_height / user_image.height
+        base_scale = t_width / user_image.width
     else:
-        scale = t_width / user_image.width
+        base_scale = t_height / user_image.height
+
+    # นำมาคูณกับ Setting ขนาดภาพที่ตั้งไว้
+    final_scale = base_scale * IMAGE_SCALE
 
     new_size = (
-        int(user_image.width * scale),
-        int(user_image.height * scale)
+        int(user_image.width * final_scale),
+        int(user_image.height * final_scale)
     )
 
     resized = user_image.resize(new_size, Image.Resampling.LANCZOS)
 
-    left = ((resized.width - t_width) // 2) + IMAGE_SHIFT_X
-    top = ((resized.height - t_height) // 2) + IMAGE_SHIFT_Y
-    right = left + t_width
-    bottom = top + t_height
-
-    if left < 0: left = 0
-    if top < 0: top = 0
-    if right > resized.width: right = resized.width
-    if bottom > resized.height: bottom = resized.height
-
-    cropped = resized.crop((left, top, right, bottom))
-
     final_image = Image.new("RGBA", (t_width, t_height))
-    paste_x = (t_width - cropped.width) // 2
-    paste_y = (t_height - cropped.height) // 2
-    final_image.paste(cropped, (paste_x, paste_y))
+
+    # คำนวณตำแหน่งวางภาพให้อยู่ตรงกลาง และบวกค่าเลื่อน (Shift)
+    paste_x = ((t_width - resized.width) // 2) + IMAGE_SHIFT_X
+    paste_y = ((t_height - resized.height) // 2) + IMAGE_SHIFT_Y
+
+    # วางภาพลงไปโดยไม่มีการครอป
+    final_image.paste(resized, (paste_x, paste_y))
 
     # -------- Apply Template (Mask) --------
     final_image.paste(template, (0, 0), template)
@@ -248,7 +248,7 @@ async def make_cover_2(ctx, *, title: str):
                 else:
                     parts.append((part, MAIN_COLOR))
 
-            current_x = START_X  # บังคับให้ข้อความเริ่มที่ตำแหน่ง X ที่ตั้งค่าไว้เพื่อชิดซ้าย
+            current_x = START_X 
 
             for i, (text, color) in enumerate(parts):
                 draw.text(
@@ -261,7 +261,7 @@ async def make_cover_2(ctx, *, title: str):
                 )
                 bbox = draw.textbbox((0, 0), text, font=font)
                 w = bbox[2] - bbox[0]
-                current_x += w  # ขยับจุดวาดข้อความชิ้นต่อไป
+                current_x += w  
 
             current_y += FONT_SIZE + LINE_SPACING
 
