@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
-import io, aiohttp, os, re
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
+import io, aiohttp, os, re, traceback
 from flask import Flask
 from threading import Thread
 
@@ -22,6 +22,89 @@ def keep_alive():
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+
+@bot.event
+async def on_ready():
+    print(f"[READY] Logged in as {bot.user} | message_content intent = {intents.message_content}")
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    """เดิมทีถ้าคำสั่งพัง จะไม่มีอะไรตอบกลับใน Discord เลย (เงียบหาย)
+    ตัวนี้ทำให้ error ถูกส่งกลับไปบอกผู้ใช้ + log ลง console"""
+    if isinstance(error, commands.CommandNotFound):
+        return
+
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("ใส่ข้อความหัวเรื่องด้วยครับ เช่น `!ทำปก ข้อความของคุณ`")
+        return
+
+    original = getattr(error, "original", error)
+    print("[COMMAND ERROR]", repr(original))
+    traceback.print_exception(type(original), original, original.__traceback__)
+
+    try:
+        await ctx.send(f"❌ ทำปกไม่สำเร็จ: `{type(original).__name__}: {original}`")
+    except discord.HTTPException:
+        pass
+
+
+# ------------------ Helpers ------------------
+MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+
+async def load_attachment_image(attachment: discord.Attachment) -> Image.Image:
+    """โหลดรูปที่แนบมาให้เป็น PIL Image
+
+    ใช้ attachment.read() เป็นหลัก เพราะ URL ของ Discord CDN เดี๋ยวนี้มีลายเซ็นหมดอายุ
+    (?ex=&is=&hm=) การยิง aiohttp.get() ตรง ๆ จะได้ 403/404 เป็นหน้า HTML กลับมา
+    แล้ว Pillow จะพังด้วย UnidentifiedImageError แบบเงียบ ๆ
+    """
+    if attachment.size > MAX_ATTACHMENT_BYTES:
+        raise ValueError(f"ไฟล์ใหญ่เกินไป ({attachment.size / 1024 / 1024:.1f} MB)")
+
+    try:
+        raw = await attachment.read()
+    except (discord.HTTPException, discord.NotFound) as e:
+        # เผื่อ attachment.read() ใช้ไม่ได้ ค่อย fallback ไปโหลดจาก URL
+        print("[WARN] attachment.read() failed, fallback to URL:", repr(e))
+        async with aiohttp.ClientSession() as session:
+            async with session.get(attachment.url) as resp:
+                if resp.status != 200:
+                    raise ValueError(f"โหลดรูปจาก Discord ไม่ได้ (HTTP {resp.status})")
+                raw = await resp.read()
+
+    if not raw:
+        raise ValueError("ไฟล์รูปว่างเปล่า")
+
+    try:
+        return Image.open(io.BytesIO(raw)).convert("RGBA")
+    except UnidentifiedImageError:
+        raise ValueError(
+            f"เปิดไฟล์รูปไม่ได้ (`{attachment.filename}`, content-type: {attachment.content_type}) "
+            "— ถ้าเป็นภาพจาก iPhone (.heic/.heif) ให้แปลงเป็น JPG/PNG ก่อนครับ"
+        )
+    except Image.DecompressionBombError:
+        raise ValueError("ภาพมีความละเอียดสูงเกินไป ลองย่อขนาดก่อนส่งครับ")
+
+
+async def send_jpeg(ctx, image: Image.Image, filename: str):
+    """แบนภาพ RGBA -> RGB แล้วส่งเป็น JPEG"""
+    background = Image.new("RGB", image.size, (20, 20, 20))
+    background.paste(image, mask=image.split()[3])
+
+    with io.BytesIO() as buffer:
+        background.save(buffer, "JPEG", quality=95)
+        buffer.seek(0)
+        await ctx.send(file=discord.File(buffer, filename))
+
+
+@bot.command(name="ping")
+async def ping(ctx):
+    """ไว้เช็คว่าบอทยังรับคำสั่งอยู่ไหม (ถ้าคำสั่งนี้เงียบ = ปัญหาอยู่ที่ intent/การ deploy ไม่ใช่โค้ดทำปก)"""
+    await ctx.send(f"pong! ({round(bot.latency * 1000)} ms)")
+
 
 # ------------------ Command ------------------
 @bot.command(name="ทำปก")
@@ -45,17 +128,15 @@ async def make_cover(ctx, *, title: str):
 
     attachment = ctx.message.attachments[0]
 
-    # -------- Load Image --------
-    async with aiohttp.ClientSession() as session:
-        async with session.get(attachment.url) as resp:
-            data = io.BytesIO(await resp.read())
-            user_image = Image.open(data).convert("RGBA")
+    async with ctx.typing():
+        # -------- Load Image --------
+        user_image = await load_attachment_image(attachment)
 
-    # -------- Load Template --------
-    template = Image.open("template.png").convert("RGBA")
-    template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
+        # -------- Load Template --------
+        template = Image.open("template.png").convert("RGBA")
+        template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
 
-    t_width, t_height = template.size
+        t_width, t_height = template.size
 
     # -------- Cover Crop --------
     img_ratio = user_image.width / user_image.height
@@ -136,17 +217,11 @@ async def make_cover(ctx, *, title: str):
             current_y += FONT_SIZE + LINE_SPACING
 
     except Exception as e:
-        print("Text Error:", e)
-
-    # -------- 🔥 FIX: Convert to JPG --------
-    background = Image.new("RGB", final_image.size, (20, 20, 20))  # สีพื้นหลัง
-    background.paste(final_image, mask=final_image.split()[3])
+        print("Text Error:", repr(e))
+        traceback.print_exc()
 
     # -------- Send --------
-    with io.BytesIO() as buffer:
-        background.save(buffer, "JPEG", quality=95)
-        buffer.seek(0)
-        await ctx.send(file=discord.File(buffer, "cover.jpg"))
+    await send_jpeg(ctx, final_image, "cover.jpg")
 
 
 @bot.command(name="ทำปก2")
@@ -180,17 +255,15 @@ async def make_cover_2(ctx, *, title: str):
 
     attachment = ctx.message.attachments[0]
 
-    # -------- Load Image --------
-    async with aiohttp.ClientSession() as session:
-        async with session.get(attachment.url) as resp:
-            data = io.BytesIO(await resp.read())
-            user_image = Image.open(data).convert("RGBA")
+    async with ctx.typing():
+        # -------- Load Image --------
+        user_image = await load_attachment_image(attachment)
 
-    # -------- Load Template --------
-    template = Image.open(TEMPLATE_FILE).convert("RGBA")
-    template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
+        # -------- Load Template --------
+        template = Image.open(TEMPLATE_FILE).convert("RGBA")
+        template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
 
-    t_width, t_height = template.size
+        t_width, t_height = template.size
 
     # -------- Resize Image (Not Fit/Crop) --------
     img_ratio = user_image.width / user_image.height
@@ -263,18 +336,16 @@ async def make_cover_2(ctx, *, title: str):
             current_y += FONT_SIZE + LINE_SPACING
 
     except Exception as e:
-        print("Text Error e")
-
-    # -------- FIX Convert to JPG --------
-    background = Image.new("RGB", final_image.size, (20, 20, 20))
-    background.paste(final_image, mask=final_image.split()[3])
+        print("Text Error:", repr(e))
+        traceback.print_exc()
 
     # -------- Send --------
-    with io.BytesIO() as buffer:
-        background.save(buffer, "JPEG", quality=95)
-        buffer.seek(0)
-        await ctx.send(file=discord.File(buffer, "cover2.jpg"))
+    await send_jpeg(ctx, final_image, "cover2.jpg")
 
 # ------------------ Run ------------------
+TOKEN = os.environ.get("TOKEN")
+if not TOKEN:
+    raise SystemExit("ไม่พบ environment variable ชื่อ TOKEN — ตั้งค่า Discord bot token ก่อนรันครับ")
+
 keep_alive()
-bot.run(os.environ.get("TOKEN"))
+bot.run(TOKEN)

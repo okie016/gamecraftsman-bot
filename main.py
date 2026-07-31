@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_file
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 import io, os, re, requests
 
 app = Flask('')
@@ -20,7 +20,13 @@ def generate_cover(image_url: str, headline: str) -> bytes:
     # -------- Load Image --------
     resp = requests.get(image_url, timeout=15)
     resp.raise_for_status()
-    user_image = Image.open(io.BytesIO(resp.content)).convert("RGBA")
+    try:
+        user_image = Image.open(io.BytesIO(resp.content)).convert("RGBA")
+    except UnidentifiedImageError:
+        raise ValueError(
+            f"เปิดไฟล์รูปไม่ได้ (content-type: {resp.headers.get('Content-Type')}) "
+            "— URL อาจหมดอายุ หรือเป็นไฟล์ที่ไม่ใช่รูปภาพ (เช่น .heic)"
+        )
 
     # -------- Load Template --------
     template = Image.open("template.png").convert("RGBA")
@@ -125,6 +131,8 @@ def render():
         jpg_bytes = generate_cover(image_url, headline)
     except requests.HTTPError as e:
         return jsonify({"error": f"ดาวน์โหลดรูปไม่ได้: {e}"}), 400
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except FileNotFoundError as e:
         return jsonify({"error": f"ไฟล์หายไป: {e}"}), 500
     except Exception as e:
