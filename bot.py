@@ -56,7 +56,8 @@ STYLE_NEWS = {                    # !ทำปก   — ข่าวเกม �
 }
 
 STYLE_NEWS_SHORT = {              # !ทำปก3 — ข่าวเกม ข้อความสั้น 2-3 บรรทัด
-    "template":     "template.png",
+    "template":     "template3.png",
+    "template_fallback": "template.png",   # ถ้ายังไม่ได้วางไฟล์ template3.png จะใช้อันนี้ไปก่อน
     "image_fit":    "cover",
     "image_scale":  1.0,
     "image_shift":  (0, 0),
@@ -173,8 +174,17 @@ def draw_headline(image, headline, style):
 
 
 # ------------------ Image Helpers ------------------
+def open_template(style):
+    """เปิดไฟล์เทมเพลต ถ้าไม่มีให้ถอยไปใช้ตัวสำรอง (บอทจะได้ไม่ล่มตอนยังไม่ได้วางไฟล์)"""
+    name = style["template"]
+    if not os.path.exists(name) and style.get("template_fallback"):
+        print(f"ไม่พบ {name} — ใช้ {style['template_fallback']} แทนไปก่อน")
+        name = style["template_fallback"]
+    return Image.open(name).convert("RGBA")
+
+
 def compose_image(user_image, style):
-    template = Image.open(style["template"]).convert("RGBA")
+    template = open_template(style)
     template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
     t_width, t_height = template.size
 
