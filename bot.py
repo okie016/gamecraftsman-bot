@@ -39,6 +39,7 @@ HIGHLIGHT_COLOR = (188, 234, 47, 255)
 #                "center" = จัดบล็อกข้อความให้อยู่กลางกรอบ text_top..text_bottom (ข้อความสั้น)
 #   side_margin  ระยะขอบซ้าย-ขวาที่ห้ามตัวหนังสือล้ำออกไป (ถ้าล้ำ ฟอนต์จะย่อลงอัตโนมัติ)
 #   size         ขนาดปกที่ออก ถ้าไม่ใส่ = ใช้ขนาดจริงของไฟล์เทมเพลต (กันเทมเพลตสัดส่วนอื่นถูกบีบ)
+#   fit_height   True = ย่อฟอนต์ถ้าข้อความสูงเกินกรอบ text_top..text_bottom (ใช้ตอนพื้นที่แคบ)
 
 STYLE_NEWS = {                    # !ทำปก   — ข่าวเกม ข้อความยาวถึง 4 บรรทัด
     "template":     "template.png",
@@ -58,19 +59,21 @@ STYLE_NEWS = {                    # !ทำปก   — ข่าวเกม �
 }
 
 STYLE_NEWS_SHORT = {              # !ทำปก3 — ข่าวเกม ข้อความสั้น 2-3 บรรทัด
-    "template":     "template3.png",
-    "template_fallback": "template.png",   # ถ้ายังไม่ได้วางไฟล์ template3.png จะใช้อันนี้ไปก่อน
+    "template":     "template3.png",       # ไฟล์จริง 2500x3125 ย่อลงเป็น 1200x1500 ให้เท่าคำสั่งอื่น
+    "template_fallback": "template.png",   # ถ้าไฟล์หาย จะใช้อันนี้แทนเพื่อไม่ให้บอทล่ม
+    "size":         TARGET_SIZE,
     "image_fit":    "cover",
     "image_scale":  1.0,
     "image_shift":  (0, 0),
     "font_size":    104,          # ตัวใหญ่ขึ้นเพราะบรรทัดน้อยกว่า
-    "min_font":     52,           # ถ้าบรรทัดยาวเกิน ฟอนต์จะย่อลงมาถึงขนาดนี้
+    "min_font":     52,           # ถ้าข้อความยาวเกิน ฟอนต์จะย่อลงมาถึงขนาดนี้
     "line_spacing": 28,
     "align":        "center",
     "start_x":      0,
-    "anchor":       "center",     # 👈 หัวใจของเวอร์ชันสั้น: ลอยอยู่กลางพื้นที่ดำ ไม่เหลือช่องว่างท้ายภาพ
-    "text_top":     985,
-    "text_bottom":  1390,
+    "anchor":       "center",     # 👈 หัวใจของเวอร์ชันสั้น: จัดกลางกรอบ ไม่เหลือช่องว่างท้ายภาพ
+    "fit_height":   True,         # โซนใต้แบดจ์แคบ ถ้าสูงเกินกรอบให้ย่อฟอนต์ลงด้วย
+    "text_top":     1097,         # แบดจ์ใน template3 อยู่ที่ y 1031-1082 (ต่ำกว่า template.png 120px)
+    "text_bottom":  1420,         # โซนนี้เตี้ยกว่าของ !ทำปก 3 บรรทัดจึงย่อลงเหลือ ~92
     "side_margin":  60,
 }
 
@@ -109,13 +112,18 @@ def line_width(draw, parts, font):
     return sum(draw.textlength(text, font=font) for text, _ in parts)
 
 
-def fit_font(draw, lines, base_size, min_size, max_width):
-    """ย่อฟอนต์ลงทีละนิดจนกว่าบรรทัดที่ยาวที่สุดจะไม่ล้นกรอบ"""
+def fit_font(draw, lines, base_size, min_size, max_width, spacing, max_height=None):
+    """ย่อฟอนต์ลงทีละนิดจนกว่าข้อความจะไม่ล้นกรอบ
+       max_height = None คือไม่สนความสูง (ใช้กับสไตล์ที่พื้นที่ด้านล่างเหลือเฟือ)"""
     size = base_size
     while size > min_size:
         font = ImageFont.truetype(FONT_FILE, size)
         if max(line_width(draw, parts, font) for parts in lines) <= max_width:
-            return font
+            if max_height is None:
+                return font
+            ink_top, ink_bottom = measure_ink(draw, lines, font, spacing)
+            if (ink_bottom - ink_top) <= max_height:
+                return font
         size -= 2
     return ImageFont.truetype(FONT_FILE, min_size)
 
@@ -151,9 +159,12 @@ def draw_headline(image, headline, style):
     else:
         max_width = width - style["side_margin"] * 2
 
-    font    = fit_font(draw, lines, style["font_size"], style["min_font"], max_width)
-    spacing = style["line_spacing"]
-    pitch   = font.size + spacing
+    spacing    = style["line_spacing"]
+    max_height = (style["text_bottom"] - style["text_top"]) if style.get("fit_height") else None
+
+    font  = fit_font(draw, lines, style["font_size"], style["min_font"],
+                     max_width, spacing, max_height)
+    pitch = font.size + spacing
 
     if style["anchor"] == "center":
         # จัดกลางจากหมึกจริง เพื่อให้ช่องว่างบน-ล่างเท่ากันจริง ๆ
