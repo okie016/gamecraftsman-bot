@@ -41,7 +41,45 @@ HIGHLIGHT_COLOR = (188, 234, 47, 255)
 #   size         ขนาดปกที่ออก ถ้าไม่ใส่ = ใช้ขนาดจริงของไฟล์เทมเพลต (กันเทมเพลตสัดส่วนอื่นถูกบีบ)
 #   fit_height   True = ย่อฟอนต์ถ้าข้อความสูงเกินกรอบ text_top..text_bottom (ใช้ตอนพื้นที่แคบ)
 
-STYLE_NEWS = {                    # !ทำปก   — ข่าวเกม ข้อความยาวถึง 4 บรรทัด
+STYLE_2LINE = {                   # !ทำปก2 — ข่าวเกม พาดหัว 2 บรรทัด
+    "template":     "template3.png",       # ไฟล์จริง 2500x3125 ย่อลงเป็น 1200x1500 ให้เท่าคำสั่งอื่น
+    "template_fallback": "template.png",   # ถ้าไฟล์หาย จะใช้อันนี้แทนเพื่อไม่ให้บอทล่ม
+    "size":         TARGET_SIZE,
+    "image_fit":    "cover",
+    "image_scale":  1.0,
+    "image_shift":  (0, 0),
+    "font_size":    104,          # 2 บรรทัดมีที่เหลือเยอะ ตัวใหญ่ได้เต็มที่
+    "min_font":     52,
+    "line_spacing": 28,
+    "align":        "center",
+    "start_x":      0,
+    "anchor":       "center",     # จัดกลางกรอบ ไม่เหลือช่องว่างท้ายภาพ
+    "fit_height":   True,         # โซนใต้แบดจ์แคบ ถ้าสูงเกินกรอบให้ย่อฟอนต์ลงด้วย
+    "text_top":     1097,         # แบดจ์ใน template3 อยู่ที่ y 1031-1082 (ต่ำกว่า template.png 120px)
+    "text_bottom":  1420,
+    "side_margin":  60,
+}
+
+STYLE_3LINE = {                   # !ทำปก3 — ข่าวเกม พาดหัว 3 บรรทัด
+    "template":     "template3.png",
+    "template_fallback": "template.png",
+    "size":         TARGET_SIZE,
+    "image_fit":    "cover",
+    "image_scale":  1.0,
+    "image_shift":  (0, 0),
+    "font_size":    92,           # เล็กกว่าแบบ 2 บรรทัด เพราะโซนใต้แบดจ์สูงแค่ 323px
+    "min_font":     52,
+    "line_spacing": 28,
+    "align":        "center",
+    "start_x":      0,
+    "anchor":       "center",
+    "fit_height":   True,
+    "text_top":     1097,
+    "text_bottom":  1420,
+    "side_margin":  60,
+}
+
+STYLE_4LINE = {                   # !ทำปก4 — ข่าวเกม พาดหัว 4 บรรทัด (ของเดิม ไม่เปลี่ยน)
     "template":     "template.png",
     "size":         TARGET_SIZE,
     "image_fit":    "cover",
@@ -58,26 +96,7 @@ STYLE_NEWS = {                    # !ทำปก   — ข่าวเกม �
     "side_margin":  60,
 }
 
-STYLE_NEWS_SHORT = {              # !ทำปก3 — ข่าวเกม ข้อความสั้น 2-3 บรรทัด
-    "template":     "template3.png",       # ไฟล์จริง 2500x3125 ย่อลงเป็น 1200x1500 ให้เท่าคำสั่งอื่น
-    "template_fallback": "template.png",   # ถ้าไฟล์หาย จะใช้อันนี้แทนเพื่อไม่ให้บอทล่ม
-    "size":         TARGET_SIZE,
-    "image_fit":    "cover",
-    "image_scale":  1.0,
-    "image_shift":  (0, 0),
-    "font_size":    104,          # ตัวใหญ่ขึ้นเพราะบรรทัดน้อยกว่า
-    "min_font":     52,           # ถ้าข้อความยาวเกิน ฟอนต์จะย่อลงมาถึงขนาดนี้
-    "line_spacing": 28,
-    "align":        "center",
-    "start_x":      0,
-    "anchor":       "center",     # 👈 หัวใจของเวอร์ชันสั้น: จัดกลางกรอบ ไม่เหลือช่องว่างท้ายภาพ
-    "fit_height":   True,         # โซนใต้แบดจ์แคบ ถ้าสูงเกินกรอบให้ย่อฟอนต์ลงด้วย
-    "text_top":     1097,         # แบดจ์ใน template3 อยู่ที่ y 1031-1082 (ต่ำกว่า template.png 120px)
-    "text_bottom":  1420,         # โซนนี้เตี้ยกว่าของ !ทำปก 3 บรรทัดจึงย่อลงเหลือ ~92
-    "side_margin":  60,
-}
-
-STYLE_INSIGHT = {                 # !ทำปก2 — บทความอินไซต์
+STYLE_INSIGHT = {                 # !ทำปกInsight — บทความอินไซต์
     "template":     "template2.png",
     "size":         TARGET_SIZE,
     "image_fit":    "top",
@@ -267,7 +286,11 @@ def render_cover(image_bytes, headline, style):
 
 
 # ------------------ Command Runner ------------------
-async def send_cover(ctx, title, style, filename):
+def count_lines(title):
+    return len([l for l in title.split("\n") if l.strip()])
+
+
+async def send_cover(ctx, title, style, filename, expect_lines=None):
     if not ctx.message.attachments:
         await ctx.send("ลืมแนบรูปครับ!")
         return
@@ -291,38 +314,63 @@ async def send_cover(ctx, title, style, filename):
         await ctx.send("ทำปกไม่สำเร็จครับ (ไฟล์รูปอาจไม่รองรับ)")
         return
 
-    await ctx.send(file=discord.File(buffer, filename))
+    # พิมพ์มาไม่ตรงจำนวนบรรทัดของคำสั่ง ทำให้อยู่ดีแต่บอกคำสั่งที่เหมาะกว่าให้
+    note = ""
+    if expect_lines is not None:
+        n = count_lines(title)
+        if n != expect_lines and 2 <= n <= 4:
+            note = f"(นี่ {n} บรรทัด ถ้าอยากได้ขนาดที่พอดีกว่านี้ลองใช้ `!ทำปก{n}` ครับ)"
+        elif n > 4:
+            note = f"(นี่ {n} บรรทัด เยอะกว่าที่ปกรองรับ ตัวหนังสือจะเล็กลงมากนะครับ)"
+
+    await ctx.send(content=note or None, file=discord.File(buffer, filename))
 
 
 # ------------------ Commands ------------------
-@bot.command(name="ทำปก")
-async def make_cover(ctx, *, title: str):
-    """ข่าวเกม — ข้อความยาวได้ถึง 4 บรรทัด"""
-    await send_cover(ctx, title, STYLE_NEWS, "cover.jpg")
-
-
-@bot.command(name="ทำปก3", aliases=["ทำปกสั้น"])
-async def make_cover_short(ctx, *, title: str):
-    """ข่าวเกม — ข้อความสั้น 2-3 บรรทัด ตัวใหญ่ขึ้นและจัดกลางพื้นที่ดำ"""
-    await send_cover(ctx, title, STYLE_NEWS_SHORT, "cover.jpg")
-
-
 @bot.command(name="ทำปก2")
 async def make_cover_2(ctx, *, title: str):
-    """บทความอินไซต์"""
-    await send_cover(ctx, title, STYLE_INSIGHT, "cover2.jpg")
+    """ข่าวเกม — พาดหัว 2 บรรทัด"""
+    await send_cover(ctx, title, STYLE_2LINE, "cover.jpg", expect_lines=2)
+
+
+@bot.command(name="ทำปก3")
+async def make_cover_3(ctx, *, title: str):
+    """ข่าวเกม — พาดหัว 3 บรรทัด"""
+    await send_cover(ctx, title, STYLE_3LINE, "cover.jpg", expect_lines=3)
+
+
+@bot.command(name="ทำปก4", aliases=["ทำปก"])
+async def make_cover_4(ctx, *, title: str):
+    """ข่าวเกม — พาดหัว 4 บรรทัด (เดิมคือ !ทำปก)"""
+    await send_cover(ctx, title, STYLE_4LINE, "cover.jpg", expect_lines=4)
+
+
+@bot.command(name="ทำปกInsight", aliases=["ทำปกinsight", "ทำปกINSIGHT", "ทำปกอินไซต์"])
+async def make_cover_insight(ctx, *, title: str):
+    """บทความอินไซต์ (เดิมคือ !ทำปก2)"""
+    await send_cover(ctx, title, STYLE_INSIGHT, "insight.jpg")
+
+
+HELP_TEXT = (
+    "ใส่ข้อความด้วยครับ เช่น\n"
+    "`!ทำปก2 บรรทัด1` — ข่าวเกม 2 บรรทัด\n"
+    "`!ทำปก3 บรรทัด1` — ข่าวเกม 3 บรรทัด\n"
+    "`!ทำปก4 บรรทัด1` — ข่าวเกม 4 บรรทัด\n"
+    "`!ทำปกInsight บรรทัด1` — บทความอินไซต์\n"
+    "ครอบคำที่อยากให้เป็นสีเขียวด้วย [color]คำนั้น[/color] และอย่าลืมแนบรูปมาด้วย"
+)
+
+
+@bot.command(name="ทำปกช่วย", aliases=["ทำปกhelp", "ทำปก?"])
+async def make_cover_help(ctx):
+    """ดูวิธีใช้ทุกคำสั่ง"""
+    await ctx.send(HELP_TEXT)
 
 
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(
-            "ใส่ข้อความด้วยครับ เช่น\n"
-            "`!ทำปก บรรทัด1` (ข้อความยาว 4 บรรทัด)\n"
-            "`!ทำปก3 บรรทัด1` (ข้อความสั้น 2-3 บรรทัด)\n"
-            "`!ทำปก2 บรรทัด1` (บทความอินไซต์)\n"
-            "ครอบคำที่อยากให้เป็นสีเขียวด้วย [color]คำนั้น[/color]"
-        )
+        await ctx.send(HELP_TEXT)
     elif isinstance(error, commands.CommandNotFound):
         return
     else:
