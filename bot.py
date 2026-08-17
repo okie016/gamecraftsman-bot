@@ -38,9 +38,11 @@ HIGHLIGHT_COLOR = (188, 234, 47, 255)
 #   anchor       "top"    = บรรทัดแรกอยู่ที่ text_top เสมอ (ข้อความยาว)
 #                "center" = จัดบล็อกข้อความให้อยู่กลางกรอบ text_top..text_bottom (ข้อความสั้น)
 #   side_margin  ระยะขอบซ้าย-ขวาที่ห้ามตัวหนังสือล้ำออกไป (ถ้าล้ำ ฟอนต์จะย่อลงอัตโนมัติ)
+#   size         ขนาดปกที่ออก ถ้าไม่ใส่ = ใช้ขนาดจริงของไฟล์เทมเพลต (กันเทมเพลตสัดส่วนอื่นถูกบีบ)
 
 STYLE_NEWS = {                    # !ทำปก   — ข่าวเกม ข้อความยาวถึง 4 บรรทัด
     "template":     "template.png",
+    "size":         TARGET_SIZE,
     "image_fit":    "cover",
     "image_scale":  1.0,
     "image_shift":  (0, 0),
@@ -74,6 +76,7 @@ STYLE_NEWS_SHORT = {              # !ทำปก3 — ข่าวเกม ข
 
 STYLE_INSIGHT = {                 # !ทำปก2 — บทความอินไซต์
     "template":     "template2.png",
+    "size":         TARGET_SIZE,
     "image_fit":    "top",
     "image_scale":  1.5,
     "image_shift":  (0, 0),
@@ -180,12 +183,18 @@ def open_template(style):
     if not os.path.exists(name) and style.get("template_fallback"):
         print(f"ไม่พบ {name} — ใช้ {style['template_fallback']} แทนไปก่อน")
         name = style["template_fallback"]
-    return Image.open(name).convert("RGBA")
+
+    template = Image.open(name).convert("RGBA")
+
+    # ไม่ระบุ size = ใช้ขนาดจริงของเทมเพลต เทมเพลตสัดส่วนอื่นจะได้ไม่ถูกบีบ
+    size = style.get("size")
+    if size and template.size != tuple(size):
+        template = template.resize(tuple(size), Image.Resampling.LANCZOS)
+    return template
 
 
 def compose_image(user_image, style):
     template = open_template(style)
-    template = template.resize(TARGET_SIZE, Image.Resampling.LANCZOS)
     t_width, t_height = template.size
 
     img_ratio      = user_image.width / user_image.height
